@@ -33,10 +33,18 @@ function Dashboard() {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
+    // =====================================================
+    // NEW: EXPENSE CONFIGURATION / DELETE STATES
+    // =====================================================
+
+    const [openMenuId, setOpenMenuId] = useState(null);
+    const [deleteExpense, setDeleteExpense] = useState(null);
+
     const currentMonthStr = useMemo(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     }, []);
+
 
     // ==========================================
     // GET USER AND EXPENSES
@@ -158,6 +166,42 @@ function Dashboard() {
     };
 
 
+    // =====================================================
+    // NEW: DELETE EXPENSE
+    // =====================================================
+
+    const handleDeleteExpense = async () => {
+        if (!deleteExpense) return;
+
+        try {
+            setError("");
+            setMessage("");
+
+            await API.delete(`/expenses/${deleteExpense._id}`);
+
+            // Close dialog
+            setDeleteExpense(null);
+
+            // Close configuration menu
+            setOpenMenuId(null);
+
+            // Show success message
+            setMessage("Expense deleted successfully");
+
+            // Refresh expenses and budget
+            await fetchExpensesAndBudget();
+
+        } catch (error) {
+            console.error("Delete expense error:", error);
+
+            setError(
+                error.response?.data?.message ||
+                "Failed to delete expense"
+            );
+        }
+    };
+
+
     // ==========================================
     // LOGOUT
     // ==========================================
@@ -190,18 +234,32 @@ function Dashboard() {
     const thisMonthExpenses = useMemo(() => {
         return expenses.filter((e) => {
             const d = new Date(e.date);
+
             if (isNaN(d.getTime())) return false;
+
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === currentMonthStr;
         });
     }, [expenses, currentMonthStr]);
 
     const thisMonthTotal = useMemo(() => {
-        return thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+        return thisMonthExpenses.reduce(
+            (sum, e) => sum + Number(e.amount || 0),
+            0
+        );
     }, [thisMonthExpenses]);
 
     const categorySuggestions = useMemo(() => {
-        const existing = expenses.map((e) => e.category?.trim()).filter(Boolean);
-        const combined = Array.from(new Set([...DEFAULT_CATEGORIES, ...existing]));
+        const existing = expenses
+            .map((e) => e.category?.trim())
+            .filter(Boolean);
+
+        const combined = Array.from(
+            new Set([
+                ...DEFAULT_CATEGORIES,
+                ...existing
+            ])
+        );
+
         return combined.sort();
     }, [expenses]);
 
@@ -504,34 +562,68 @@ function Dashboard() {
 
 
                 {/* ==================================
-                    BUDGET OVERVIEW BANNER (IF CONFIGURED)
+                    BUDGET OVERVIEW BANNER
                 ================================== */}
 
                 {budgetData && budgetData.totalBudget > 0 && (
-                    <div className="dashboard-budget-banner" onClick={() => navigate("/budget")}>
+
+                    <div
+                        className="dashboard-budget-banner"
+                        onClick={() => navigate("/budget")}
+                    >
+
                         <div className="budget-banner-header">
+
                             <div className="budget-banner-title">
-                                <span className="budget-banner-icon">⊞</span>
+
+                                <span className="budget-banner-icon">
+                                    ⊞
+                                </span>
+
                                 <div>
-                                    <strong>Monthly Budget Progress</strong>
+
+                                    <strong>
+                                        Monthly Budget Progress
+                                    </strong>
+
                                     <p>
                                         ₹{thisMonthTotal.toFixed(2)} spent of ₹{budgetData.totalBudget.toFixed(2)} limit ({((thisMonthTotal / budgetData.totalBudget) * 100).toFixed(1)}%)
                                     </p>
+
                                 </div>
+
                             </div>
+
 
                             <div>
+
                                 {(thisMonthTotal / budgetData.totalBudget) >= 1 ? (
-                                    <span className="badge badge-danger">🚨 Budget Exceeded</span>
+
+                                    <span className="badge badge-danger">
+                                        🚨 Budget Exceeded
+                                    </span>
+
                                 ) : (thisMonthTotal / budgetData.totalBudget) >= 0.8 ? (
-                                    <span className="badge badge-warning">⚠️ Approaching Limit (80%+)</span>
+
+                                    <span className="badge badge-warning">
+                                        ⚠️ Approaching Limit (80%+)
+                                    </span>
+
                                 ) : (
-                                    <span className="badge badge-success">✓ On Track</span>
+
+                                    <span className="badge badge-success">
+                                        ✓ On Track
+                                    </span>
+
                                 )}
+
                             </div>
+
                         </div>
 
+
                         <div className="budget-progress-bar-bg small-bar">
+
                             <div
                                 className={`budget-progress-bar-fill ${
                                     (thisMonthTotal / budgetData.totalBudget) >= 1
@@ -541,11 +633,17 @@ function Dashboard() {
                                         : "fill-success"
                                 }`}
                                 style={{
-                                    width: `${Math.min((thisMonthTotal / budgetData.totalBudget) * 100, 100)}%`
+                                    width: `${Math.min(
+                                        (thisMonthTotal / budgetData.totalBudget) * 100,
+                                        100
+                                    )}%`
                                 }}
                             ></div>
+
                         </div>
+
                     </div>
+
                 )}
 
 
@@ -639,9 +737,14 @@ function Dashboard() {
                                     />
 
                                     <datalist id="dashboard-category-suggestions">
+
                                         {categorySuggestions.map((cat) => (
-                                            <option key={cat} value={cat} />
+                                            <option
+                                                key={cat}
+                                                value={cat}
+                                            />
                                         ))}
+
                                     </datalist>
 
                                 </div>
@@ -700,18 +803,22 @@ function Dashboard() {
                         {/* SUCCESS MESSAGE */}
 
                         {message && (
+
                             <p className="success">
                                 {message}
                             </p>
+
                         )}
 
 
                         {/* ERROR MESSAGE */}
 
                         {error && (
+
                             <p className="error">
                                 {error}
                             </p>
+
                         )}
 
                     </div>
@@ -776,6 +883,8 @@ function Dashboard() {
                                             key={expense._id}
                                         >
 
+                                            {/* EXPENSE INFORMATION */}
+
                                             <div className="expense-info">
 
                                                 <div className="expense-icon">
@@ -810,14 +919,79 @@ function Dashboard() {
                                             </div>
 
 
-                                            <strong>
+                                            {/* ==================================
+                                                EXPENSE RIGHT SIDE
+                                            ================================== */}
 
-                                                - ₹
-                                                {Number(
-                                                    expense.amount
-                                                ).toFixed(2)}
+                                            <div className="expense-right">
 
-                                            </strong>
+                                                {/* AMOUNT */}
+
+                                                <strong>
+
+                                                    - ₹
+                                                    {Number(
+                                                        expense.amount
+                                                    ).toFixed(2)}
+
+                                                </strong>
+
+
+                                                {/* ==================================
+                                                    CONFIGURATION BUTTON
+                                                ================================== */}
+
+                                                <div className="expense-menu-container">
+
+                                                    <button
+                                                        type="button"
+                                                        className="expense-menu-btn"
+                                                        onClick={() =>
+                                                            setOpenMenuId(
+                                                                openMenuId === expense._id
+                                                                    ? null
+                                                                    : expense._id
+                                                            )
+                                                        }
+                                                        title="Expense options"
+                                                    >
+                                                        ⋮
+                                                    </button>
+
+
+                                                    {/* ==================================
+                                                        CONFIGURATION MENU
+                                                    ================================== */}
+
+                                                    {openMenuId === expense._id && (
+
+                                                        <div className="expense-menu">
+
+                                                            <button
+                                                                type="button"
+                                                                className="delete-menu-item"
+                                                                onClick={() => {
+
+                                                                    setDeleteExpense(
+                                                                        expense
+                                                                    );
+
+                                                                    setOpenMenuId(
+                                                                        null
+                                                                    );
+
+                                                                }}
+                                                            >
+                                                                🗑 Delete
+                                                            </button>
+
+                                                        </div>
+
+                                                    )}
+
+                                                </div>
+
+                                            </div>
 
                                         </div>
 
@@ -832,6 +1006,82 @@ function Dashboard() {
                 </section>
 
             </main>
+
+
+            {/* ==========================================
+                DELETE CONFIRMATION DIALOG
+            ========================================== */}
+
+            {deleteExpense && (
+
+                <div
+                    className="delete-dialog-overlay"
+                    onClick={() => setDeleteExpense(null)}
+                >
+
+                    <div
+                        className="delete-dialog"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+
+                        {/* DELETE ICON */}
+
+                        <div className="delete-dialog-icon">
+                            🗑
+                        </div>
+
+
+                        {/* TITLE */}
+
+                        <h2>
+                            Delete Expense?
+                        </h2>
+
+
+                        {/* MESSAGE */}
+
+                        <p>
+                            Are you sure you want to delete{" "}
+                            <strong>
+                                "{deleteExpense.title}"
+                            </strong>
+                            ?
+                        </p>
+
+
+                        <p className="delete-warning">
+                            This action cannot be undone.
+                        </p>
+
+
+                        {/* BUTTONS */}
+
+                        <div className="delete-dialog-actions">
+
+                            <button
+                                type="button"
+                                className="cancel-delete-btn"
+                                onClick={() => setDeleteExpense(null)}
+                            >
+                                Cancel
+                            </button>
+
+
+                            <button
+                                type="button"
+                                className="confirm-delete-btn"
+                                onClick={handleDeleteExpense}
+                            >
+                                Delete
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            )}
 
         </div>
     );
