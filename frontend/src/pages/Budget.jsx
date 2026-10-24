@@ -331,9 +331,6 @@ function Budget() {
                 </div>
             </aside>
 
-            {/* ==================================
-                MAIN CONTENT
-            ================================== */}
             <main className="dashboard-main">
                 {/* TOP BAR */}
                 <header className="topbar">
@@ -353,7 +350,6 @@ function Budget() {
                     </div>
                 </header>
 
-                {/* NOTIFICATIONS */}
                 {successMessage && (
                     <div className="alert alert-success">
                         <span>✓ {successMessage}</span>
@@ -368,9 +364,6 @@ function Budget() {
                     </div>
                 )}
 
-                {/* ==================================
-                    MONTH SELECTOR & ACTION BAR
-                ================================== */}
                 <div className="budget-controls-bar">
                     <div className="month-navigator">
                         <button className="btn-month-nav" onClick={handlePrevMonth} title="Previous Month">

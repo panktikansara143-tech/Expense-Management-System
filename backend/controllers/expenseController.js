@@ -58,18 +58,64 @@ const addExpense = async (req, res) => {
 };
 
 
-// ==========================================
-// GET ALL EXPENSES OF LOGGED-IN USER
-// ==========================================
+// (WITH PAGINATION)
 const getExpenses = async (req, res) => {
     try {
+        const DEFAULT_PAGE = 1;
+        const DEFAULT_LIMIT = 10;
+
+       
+        if (req.query.all === "true") {
+            const expenses = await Expense.find({
+                user: req.user.userId
+            }).sort({ date: -1 });
+
+            const totalRecords = expenses.length;
+            return res.status(200).json({
+                message: "Expenses fetched successfully",
+                expenses,
+                page: 1,
+                currentPage: 1,
+                limit: totalRecords,
+                totalPages: 1,
+                totalRecords
+            });
+        }
+
+        let page = parseInt(req.query.page, 10);
+        let limit = parseInt(req.query.limit, 10);
+
+        if (isNaN(page) || page < 1) {
+            page = DEFAULT_PAGE;
+        }
+
+        if (isNaN(limit) || limit < 1 || limit > 50) {
+            limit = DEFAULT_LIMIT;
+        }
+
+        const totalRecords = await Expense.countDocuments({
+            user: req.user.userId
+        });
+
+        const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
+
+        const skip = (page - 1) * limit;
+
         const expenses = await Expense.find({
             user: req.user.userId
-        }).sort({ date: -1 });
+        })
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).json({
             message: "Expenses fetched successfully",
-            expenses
+            expenses,
+            page,
+            currentPage: page,
+            limit,
+            totalPages,
+            totalRecords
         });
 
     } catch (error) {

@@ -33,9 +33,6 @@ function Dashboard() {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
-    // =====================================================
-    // NEW: EXPENSE CONFIGURATION / DELETE STATES
-    // =====================================================
 
     const [openMenuId, setOpenMenuId] = useState(null);
     const [deleteExpense, setDeleteExpense] = useState(null);
@@ -45,10 +42,6 @@ function Dashboard() {
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     }, []);
 
-
-    // ==========================================
-    // GET USER AND EXPENSES
-    // ==========================================
 
     useEffect(() => {
         const savedUser = localStorage.getItem("user");
@@ -71,14 +64,10 @@ function Dashboard() {
     }, [navigate]);
 
 
-    // ==========================================
-    // FETCH EXPENSES & BUDGET
-    // ==========================================
-
     const fetchExpensesAndBudget = async () => {
         try {
             const [expRes, budgetRes] = await Promise.all([
-                API.get("/expenses"),
+                API.get("/expenses?all=true"),
                 API.get(`/budget?month=${currentMonthStr}`)
             ]);
 

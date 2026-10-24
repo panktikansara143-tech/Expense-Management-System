@@ -24,14 +24,17 @@ function Transactions() {
     const [error, setError] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
 
-    // Filter states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [limit, setLimit] = useState(10);
+
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [dateFilter, setDateFilter] = useState("all");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
-    // Modal states
     const [editingExpense, setEditingExpense] = useState(null);
     const [editForm, setEditForm] = useState({
         title: "",
@@ -46,7 +49,6 @@ function Transactions() {
     const [deletingExpense, setDeletingExpense] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    // Auto-dismiss success messages
     useEffect(() => {
         if (successMessage) {
             const timer = setTimeout(() => {
@@ -56,9 +58,6 @@ function Transactions() {
         }
     }, [successMessage]);
 
-    // ==========================================
-    // PAGE LOAD & AUTH CHECK
-    // ==========================================
     useEffect(() => {
         const token = localStorage.getItem("token");
         const savedUser = localStorage.getItem("user");
@@ -75,20 +74,18 @@ function Transactions() {
                 console.error("Unable to read user information", err);
             }
         }
-
-        fetchExpenses();
     }, [navigate]);
 
-    // ==========================================
-    // FETCH EXPENSES
-    // ==========================================
-    const fetchExpenses = async () => {
+    const fetchExpenses = async (page = currentPage, currentLimit = limit) => {
         try {
             setLoading(true);
             setError("");
 
-            const response = await API.get("/expenses");
+            const response = await API.get(`/expenses?page=${page}&limit=${currentLimit}`);
             setExpenses(response.data.expenses || []);
+            setTotalPages(response.data.totalPages || 1);
+            setTotalRecords(response.data.totalRecords ?? 0);
+            setCurrentPage(response.data.currentPage || page);
         } catch (err) {
             console.error("Error fetching expenses:", err);
 
@@ -106,19 +103,43 @@ function Transactions() {
             setLoading(false);
         }
     };
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            fetchExpenses(currentPage, limit);
+        }
+    }, [currentPage, limit]);
 
-    // ==========================================
-    // LOGOUT
-    // ==========================================
+    const handlePrevPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage((prev) => prev - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage((prev) => prev + 1);
+        }
+    };
+
+    const handlePageClick = (pageNum) => {
+        if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
+            setCurrentPage(pageNum);
+        }
+    };
+
+    const handleLimitChange = (e) => {
+        const newLimit = Number(e.target.value);
+        setLimit(newLimit);
+        setCurrentPage(1);
+    };
+
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         navigate("/login");
     };
 
-    // ==========================================
-    // DATE FORMATTERS
-    // ==========================================
     const formatDate = (dateString) => {
         if (!dateString) return "N/A";
         return new Date(dateString).toLocaleDateString("en-IN", {
@@ -135,9 +156,6 @@ function Transactions() {
         return d.toISOString().split("T")[0];
     };
 
-    // ==========================================
-    // DYNAMIC CATEGORIES
-    // ==========================================
     const uniqueCategories = useMemo(() => {
         const categoriesSet = new Set(
             expenses.map((e) => e.category?.trim()).filter(Boolean)
@@ -151,12 +169,8 @@ function Transactions() {
         return combined.sort();
     }, [expenses]);
 
-    // ==========================================
-    // COMBINED FILTERING LOGIC
-    // ==========================================
     const filteredExpenses = useMemo(() => {
         return expenses.filter((expense) => {
-            // 1. Search filter (Title, Category, Description)
             if (searchQuery.trim() !== "") {
                 const query = searchQuery.toLowerCase().trim();
                 const titleMatch = expense.title?.toLowerCase().includes(query);
@@ -168,14 +182,12 @@ function Transactions() {
                 }
             }
 
-            // 2. Category filter
             if (selectedCategory !== "All") {
                 if (expense.category !== selectedCategory) {
                     return false;
                 }
             }
 
-            // 3. Date filter
             if (dateFilter !== "all") {
                 const expDate = new Date(expense.date);
                 const now = new Date();
@@ -221,7 +233,6 @@ function Transactions() {
         });
     }, [expenses, searchQuery, selectedCategory, dateFilter, startDate, endDate]);
 
-    // Summary calculations
     const totalOverallAmount = useMemo(() => {
         return expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     }, [expenses]);
@@ -245,9 +256,6 @@ function Transactions() {
         setEndDate("");
     };
 
-    // ==========================================
-    // EDIT EXPENSE
-    // ==========================================
     const handleOpenEdit = (expense) => {
         setEditingExpense(expense);
         setEditForm({
@@ -311,9 +319,6 @@ function Transactions() {
         }
     };
 
-    // ==========================================
-    // DELETE EXPENSE
-    // ==========================================
     const handleOpenDelete = (expense) => {
         setDeletingExpense(expense);
     };
@@ -326,9 +331,15 @@ function Transactions() {
 
             await API.delete(`/expenses/${deletingExpense._id}`);
 
-            setExpenses((prev) => prev.filter((exp) => exp._id !== deletingExpense._id));
             setDeletingExpense(null);
             setSuccessMessage("Expense deleted successfully!");
+
+            const targetPage = (expenses.length === 1 && currentPage > 1) ? currentPage - 1 : currentPage;
+            if (targetPage !== currentPage) {
+                setCurrentPage(targetPage);
+            } else {
+                fetchExpenses(currentPage, limit);
+            }
         } catch (err) {
             console.error("Error deleting expense:", err);
             if (err.response?.status === 401) {
@@ -346,9 +357,6 @@ function Transactions() {
 
     return (
         <div className="dashboard">
-            {/* ==================================
-                SIDEBAR (LIGHT MODE)
-            ================================== */}
             <aside className="sidebar light-sidebar">
                 <div className="logo">
                     <div className="logo-icon">₹</div>
@@ -402,11 +410,7 @@ function Transactions() {
                 </div>
             </aside>
 
-            {/* ==================================
-                MAIN CONTENT
-            ================================== */}
             <main className="dashboard-main">
-                {/* TOP BAR */}
                 <header className="topbar">
                     <div>
                         <h1>Transactions</h1>
@@ -424,7 +428,6 @@ function Transactions() {
                     </div>
                 </header>
 
-                {/* NOTIFICATION ALERTS */}
                 {successMessage && (
                     <div className="alert alert-success">
                         <span>✓ {successMessage}</span>
@@ -439,44 +442,49 @@ function Transactions() {
                     </div>
                 )}
 
-                {/* ==================================
-                    SUMMARY CARDS
-                ================================== */}
                 <section className="transaction-summary">
                     <div className="transaction-summary-card">
                         <div className="summary-card-header">
-                            <span>Total Transactions</span>
+                            <span>Total Records</span>
                             <div className="card-badge">
-                                {isFilterActive ? `${filteredExpenses.length} Filtered` : "Total"}
+                                Total
                             </div>
                         </div>
-                        <strong>{filteredExpenses.length}</strong>
-                        {isFilterActive && (
-                            <small className="summary-subtext">out of {expenses.length} total</small>
-                        )}
+                        <strong>{totalRecords}</strong>
+                        <small className="summary-subtext">
+                            {isFilterActive ? `Showing ${filteredExpenses.length} on page ${currentPage}` : `All recorded expenses`}
+                        </small>
                     </div>
 
                     <div className="transaction-summary-card">
                         <div className="summary-card-header">
-                            <span>Total Amount</span>
+                            <span>Total Pages</span>
                             <div className="card-badge">
-                                {isFilterActive ? "Filtered Sum" : "Overall Sum"}
+                                Page {currentPage} of {totalPages}
+                            </div>
+                        </div>
+                        <strong>{totalPages}</strong>
+                        <small className="summary-subtext">
+                            {limit} records per page
+                        </small>
+                    </div>
+
+                    <div className="transaction-summary-card">
+                        <div className="summary-card-header">
+                            <span>Page Amount</span>
+                            <div className="card-badge">
+                                {isFilterActive ? "Filtered Sum" : "Page Sum"}
                             </div>
                         </div>
                         <strong className="text-primary">
                             ₹{filteredTotalAmount.toFixed(2)}
                         </strong>
-                        {isFilterActive && (
-                            <small className="summary-subtext">
-                                Total: ₹{totalOverallAmount.toFixed(2)}
-                            </small>
-                        )}
+                        <small className="summary-subtext">
+                            Total on page: ₹{totalOverallAmount.toFixed(2)}
+                        </small>
                     </div>
                 </section>
 
-                {/* ==================================
-                    TRANSACTIONS CONTAINER & FILTERS
-                ================================== */}
                 <section className="transaction-container">
                     <div className="transaction-header-row">
                         <div>
@@ -491,9 +499,7 @@ function Transactions() {
                         )}
                     </div>
 
-                    {/* FILTER CONTROL BAR */}
                     <div className="filter-bar">
-                        {/* 1. SEARCH BOX */}
                         <div className="filter-group search-input-wrapper">
                             <span className="search-icon">🔍</span>
                             <input
@@ -514,7 +520,6 @@ function Transactions() {
                             )}
                         </div>
 
-                        {/* 2. CATEGORY FILTER */}
                         <div className="filter-group">
                             <label className="filter-label">Category</label>
                             <select
@@ -531,7 +536,6 @@ function Transactions() {
                             </select>
                         </div>
 
-                        {/* 3. DATE FILTER */}
                         <div className="filter-group">
                             <label className="filter-label">Date Range</label>
                             <select
@@ -547,7 +551,6 @@ function Transactions() {
                             </select>
                         </div>
 
-                        {/* CUSTOM DATE RANGE INPUTS */}
                         {dateFilter === "custom" && (
                             <div className="custom-date-group">
                                 <div className="filter-group">
@@ -709,12 +712,88 @@ function Transactions() {
                             </table>
                         </div>
                     )}
+
+                    {/* ==================================
+                        PAGINATION CONTROLS
+                    ================================== */}
+                    {!loading && !error && totalRecords > 0 && (
+                        <div className="pagination-bar">
+                            <div className="pagination-info">
+                                <span>
+                                    Showing{" "}
+                                    <strong>{(currentPage - 1) * limit + 1}</strong> -{" "}
+                                    <strong>{Math.min(currentPage * limit, totalRecords)}</strong> of{" "}
+                                    <strong>{totalRecords}</strong> records
+                                </span>
+                                <span className="pagination-tag">
+                                    Total Records: <strong>{totalRecords}</strong>
+                                </span>
+                                <span className="pagination-tag">
+                                    Total Pages: <strong>{totalPages}</strong>
+                                </span>
+                            </div>
+
+                            <div className="pagination-actions">
+                                <div className="pagination-limit-selector">
+                                    <label htmlFor="limit-select">Rows per page:</label>
+                                    <select
+                                        id="limit-select"
+                                        value={limit}
+                                        onChange={handleLimitChange}
+                                        className="limit-dropdown"
+                                    >
+                                        <option value={5}>5</option>
+                                        <option value={10}>10</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                    </select>
+                                </div>
+
+                                <div className="pagination-nav">
+                                    <button
+                                        id="prev-btn"
+                                        className="pagination-btn prev-btn"
+                                        onClick={handlePrevPage}
+                                        disabled={currentPage <= 1}
+                                        title={currentPage <= 1 ? "Disabled on page 1" : "Previous Page"}
+                                    >
+                                        ← Previous
+                                    </button>
+
+                                    <div className="page-indicator" id="page-indicator">
+                                        Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+                                    </div>
+
+                                    {totalPages > 1 && (
+                                        <div className="page-number-buttons">
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                                                <button
+                                                    key={pageNum}
+                                                    className={`page-num-btn ${pageNum === currentPage ? "active" : ""}`}
+                                                    onClick={() => handlePageClick(pageNum)}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        id="next-btn"
+                                        className="pagination-btn next-btn"
+                                        onClick={handleNextPage}
+                                        disabled={currentPage >= totalPages}
+                                        title={currentPage >= totalPages ? "Disabled on last page" : "Next Page"}
+                                    >
+                                        Next →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </section>
             </main>
 
-            {/* ==================================
-                EDIT EXPENSE MODAL
-            ================================== */}
             {editingExpense && (
                 <div className="modal-overlay" onClick={() => setEditingExpense(null)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -886,4 +965,4 @@ function Transactions() {
     );
 }
 
-export default Transactions;
+export default Transactions;

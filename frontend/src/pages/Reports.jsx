@@ -23,9 +23,6 @@ function Reports() {
     const [error, setError] = useState("");
     const [timeRange, setTimeRange] = useState("all");
 
-    // ==========================================
-    // PAGE LOAD & AUTH CHECK
-    // ==========================================
     useEffect(() => {
         const token = localStorage.getItem("token");
         const savedUser = localStorage.getItem("user");
@@ -46,15 +43,12 @@ function Reports() {
         fetchExpenses();
     }, [navigate]);
 
-    // ==========================================
-    // FETCH EXPENSES
-    // ==========================================
     const fetchExpenses = async () => {
         try {
             setLoading(true);
             setError("");
 
-            const response = await API.get("/expenses");
+            const response = await API.get("/expenses?all=true");
             setExpenses(response.data.expenses || []);
         } catch (err) {
             console.error("Error fetching expenses:", err);
